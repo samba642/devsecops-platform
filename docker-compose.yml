@@ -10,11 +10,14 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-    ports:
-      - "${POSTGRES_PORT}:5432"
-
     volumes:
       - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     image: devsecops-backend:1.0
@@ -28,11 +31,28 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
 
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    image: devsecops-frontend:1.0
+    container_name: devsecops-frontend
+    restart: unless-stopped
+
     ports:
-      - "5000:5000"
+      - "3000:80"
 
     depends_on:
-      - postgres
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres-data:
